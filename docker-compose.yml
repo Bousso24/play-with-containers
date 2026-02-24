@@ -1,0 +1,114 @@
+version: '3.8'
+networks:
+  my-network:
+    driver: bridge
+    name: my-network
+#volumes:
+volumes:
+  inventory-db-volume:
+    name: inventory-db-volume
+  billing-db-volume:
+    name: billing-db-volume
+  api-gateway-logs-volume:
+    name: api-gateway-logs-volume
+
+services:
+  inventory-db:
+    image: postgres:15-alpine
+    container_name: inventory-db
+    restart: on-failure
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      POSTGRES_DB: ${INVENTORY_DB_NAME:-movies_db}
+    volumes:
+      - inventory-db-volume:/var/lib/postgresql/data
+    networks:
+      - my-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  billing-db:
+    image: postgres:15-alpine
+    container_name: billing-db
+    restart: on-failure
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres123}
+      POSTGRES_DB: ${BILLING_DB_NAME:-billing_db}
+    volumes:
+      - billing-db-volume:/var/lib/postgresql/data
+    networks:
+      - my-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: rabbit-queue
+    restart: on-failure
+    environment:
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASS: ${RABBITMQ_PASS:-guest}
+    networks:
+      - my-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    
+  inventory-app:
+    build: ./srcs/inventory-app
+    container_name: inventory-app
+    restart: on-failure
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+    environment:
+      INVENTORY_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres123}@inventory-db:5432/${INVENTORY_DB_NAME:-movies_db}
+    networks:
+      - my-network
+  
+  billing-app:
+    build: ./srcs/billing-app
+    container_name: billing-app-api
+    restart: on-failure
+    depends_on:
+      billing-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      BILLING_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres123}@billing-db:5432/${BILLING_DB_NAME:-billing_db}
+      RABBITMQ_HOST: rabbit-queue
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+    networks:
+      - my-network  
+    command: python3 app/consumer.py
+
+  api-gateway:
+    build: ./srcs/api-gateway
+    container_name: api-gateway
+    restart: on-failure
+    environment:
+      INVENTORY_API_URL: http://inventory-app:5001
+      RABBITMQ_HOST: rabbit-queue
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      CONFIG_PATH: /app/config.yaml
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config.yaml:/app/config.yaml
+      - api-gateway-logs-volume:/app/logs
+    networks:
+      - my-network

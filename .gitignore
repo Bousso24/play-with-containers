@@ -1,0 +1,23 @@
+# 🐍 PYTHON
+__pycache__/
+.python-version
+venv/
+.env
+
+# 📋 LOGS
+*.log
+logs/
+**/logs/
+
+# 🐳 DOCKER
+.dockerignore
+
+# 💻 IDE
+.vscode/
+
+# 📝 FICHIERS DE CONFIGURATION LOCAUX
+config.yaml
+
+# 📚 DOCUMENTATION GÉNÉRÉE
+docs/_build/
+site/
