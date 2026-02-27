@@ -5,6 +5,26 @@ Pour ce projet, on va mettre en place une architecture de microservices avec doc
 Pour chaque service, on va cree un conteneur Dockerfile ainsi que les services stantard(les base de donnees, rabbitmq).
 Tout d abord nous devrons disposer d un reseau Docker qui etablit la connexion entre tous les services a l interieur de notre hote docker.
 
+## 🏗️ Architecture
+- API Gateway (port 3000)
+- Inventory Service (port 8080 interne)
+- Billing Service (port 8080 interne)
+- RabbitMQ (message queue)
+- PostgreSQL (2 bases de données)
+
+## 📋 Prérequis
+- Docker 20.10.
+- Docker Compose 1.29.
+```bash
+sudo apt install -y docker.io
+sudo systemctl enable docker
+sudo systemctl start docker
+sudo usermod -aG docker $USER
+newgrp docker
+docker --version
+docker compose version
+```
+
 1. Creons notre reseaux prive appele my-network
 ```bash 
 docker network create my-network 
@@ -168,6 +188,9 @@ curl -X POST http://localhost:8080/api/movies/ \
 curl http://localhost:8080/api/movies/
 
 docker logs api-gateway --tail 10
+
+Ajouter votre utilisateur au groupe docker (pour éviter sudo)
+sudo usermod -aG docker $USER
 ```
 ## - configuration du fichier docker-compose.yaml
 Le docker-compose est un outil qui permet de definir et d executer des application Docker multi-conteneur, avec compose on va cree un fichier .taml pour configurer les services de notre application.
@@ -200,12 +223,12 @@ curl http://localhost:3000/api/movies
 # Tester la création d'un film via gateway
 curl -X POST http://localhost:3000/api/movies \
   -H "Content-Type: application/json" \
-  -d '{"title":"Test Gateway","description":"Via API Gateway"}'
+  -d '{"title":"Test","description":"test"}'
 
 # Tester billing via gateway
 curl -X POST http://localhost:3000/api/billing \
   -H "Content-Type: application/json" \
-  -d '{"user_id":"123","number_of_items":3,"total_amount":1000}'
+  -d '{"user_id":"3","number_of_items":4,"total_amount":4000}'
 
 # Voir les films dans inventory-db
 sudo docker exec -it inventory-db psql -U postgres -d movies_db -c "SELECT * FROM movies;"
@@ -226,7 +249,7 @@ scalabilite -> facile de duplique pour gerer plus de charge
 * la difference entre un coteneur et une machine virtuelle:
 -> un conteneur partage le meme systeme d exploitation de l hote alors qu une VM a son propre OS complet
 -> pour la performance et la taille: les conteneurs sont legers (quelque Mo/Go) et utilise moin de memoire alors que les VM sont lourdes (plusieurs Go) car elles embarquent un systeme d exploitation complet.
-->demarrage: un conteneur demarre quelque secondes alors qu un VM demarre queleque minutes. 
+->demarrage: un conteneur demarre quelque secondes alors qu une VM demarre quelque minutes. 
 
 * Docker: docker est une plateforme open source de conteneurisation qui permet d empaqueter une application et toutes ses dependances dans un conteneur leger et portable.
 Il sert a garantir qu une application fonctionne de maniere identique quel que soit l environnement (dev, test, prod) facilitant ainsi le deploiement rapide et la gestion des microservices.
@@ -276,6 +299,13 @@ les volumes constituent le mecanisme privilegie pour la persistance des donnees 
 * un reseau Docker: il permet a un utilisateur de connecter un conteneur docker a autant de reseaux qu il le souhaite, il permet de cree un reseau prive pour la communication entre les differents API.
 il permet de connecter des conteneurs entre eux, permettant la communication d'applications distribuées
 
-* image Docker: est modele en lecture seul qui contient ensemble d instructions pour creer un conteneur pouvant s executer sur la plateforme docker.
+* image Docker: est un modele en lecture seul qui contient ensemble d instructions pour creer un conteneur pouvant s executer sur la plateforme docker.
 Les images Docker sont utilisées pour empaqueter des applications avec toutes leurs dépendances (bibliothèques, configurations, code) dans un format unique, léger et immuable. Elles garantissent la portabilité et la reproductibilité ("ça marche sur ma machine" partout), simplifient le déploiement, et permettent d'isoler les services pour éviter les conflits.
 
+## 🚀 Installation
+
+1. Cloner le projet
+3. Lancer l'infrastructure :
+```bash
+docker-compose up -d
+```
